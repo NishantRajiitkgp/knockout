@@ -8,6 +8,7 @@ import { EnableReminders } from "./EnableReminders";
 import { Diagnostics } from "./Diagnostics";
 import { ToastProvider, useToast } from "./Toast";
 import { TimeWheel } from "./TimeWheel";
+import { PunchInReminder } from "./PunchInReminder";
 
 function nowTimeStr(): string {
   const d = new Date();
@@ -192,6 +193,8 @@ function DashboardInner({ userName }: { userName: string | null }) {
           <PunchInCard onPunchIn={punchIn} />
         )}
       </div>
+
+      <PunchInReminder />
 
       <History sessions={recent} onDelete={removeLog} />
 

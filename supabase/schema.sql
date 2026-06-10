@@ -43,5 +43,16 @@ create table if not exists public.push_subscriptions (
 create index if not exists push_subscriptions_user_idx
   on public.push_subscriptions (user_email);
 
-alter table public.punch_sessions   enable row level security;
+-- ── User settings (daily punch-in reminder) ──────────────────────
+create table if not exists public.user_settings (
+  user_email        text primary key,
+  punch_in_enabled  boolean     not null default false,   -- off by default
+  punch_in_time     text        not null default '09:30',  -- local wall time HH:MM
+  time_zone         text,                                  -- IANA tz
+  schedule_id       text,                                  -- QStash schedule id
+  updated_at        timestamptz not null default now()
+);
+
+alter table public.punch_sessions    enable row level security;
 alter table public.push_subscriptions enable row level security;
+alter table public.user_settings      enable row level security;

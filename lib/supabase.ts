@@ -36,6 +36,15 @@ export type PunchSession = {
   created_at: string;
 };
 
+export type UserSettings = {
+  user_email: string;
+  punch_in_enabled: boolean;
+  punch_in_time: string;
+  time_zone: string | null;
+  schedule_id: string | null;
+  updated_at: string;
+};
+
 export type PushSubscriptionRow = {
   id: string;
   user_email: string;

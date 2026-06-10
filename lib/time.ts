@@ -50,6 +50,50 @@ export function formatDay(iso: string, timeZone?: string | null): string {
   });
 }
 
+/** "9:30 AM" from a local "HH:MM" string. */
+export function formatTimeLabel(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  const d = new Date();
+  d.setHours(h || 0, m || 0, 0, 0);
+  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
+/** Minutes a timezone is ahead of UTC at the given date (IST → +330). */
+export function tzOffsetMinutes(timeZone: string, date: Date = new Date()): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(date);
+  const map: Record<string, string> = {};
+  for (const p of parts) map[p.type] = p.value;
+  let hour = Number(map.hour);
+  if (hour === 24) hour = 0;
+  const asUTC = Date.UTC(
+    Number(map.year),
+    Number(map.month) - 1,
+    Number(map.day),
+    hour,
+    Number(map.minute),
+    Number(map.second)
+  );
+  return Math.round((asUTC - date.getTime()) / 60_000);
+}
+
+/** Convert a local "HH:MM" in `timeZone` to a daily UTC cron "m h * * *". */
+export function dailyCronUtc(time: string, timeZone: string | null): string {
+  const [h, m] = time.split(":").map(Number);
+  const offset = timeZone ? tzOffsetMinutes(timeZone) : 0;
+  let total = (h || 0) * 60 + (m || 0) - offset; // local → UTC
+  total = ((total % 1440) + 1440) % 1440;
+  return `${total % 60} ${Math.floor(total / 60)} * * *`;
+}
+
 /** Long date for headers: "Wednesday, Jun 10". */
 export function formatLongDate(date: Date = new Date()): string {
   return date.toLocaleDateString("en-US", {
