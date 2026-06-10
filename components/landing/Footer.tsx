@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { Reveal } from "./Reveal";
 import { SignInButton } from "@/components/auth/SignInButton";
@@ -61,10 +62,20 @@ export function Footer() {
       </div>
       <div className="mx-auto max-w-content px-5 pb-10 sm:px-8">
         <div className="rule-fade" />
-        <p className="mt-6 text-[12px] text-stone">
-          © {new Date().getFullYear()} Knockout. Built for everyone who keeps
-          forgetting to leave.
-        </p>
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-[12px] text-stone">
+            © {new Date().getFullYear()} Knockout. Built for everyone who keeps
+            forgetting to leave.
+          </p>
+          <nav className="flex items-center gap-5 text-[12px]">
+            <Link href="/privacy" className="text-mute transition-colors hover:text-ink">
+              Privacy
+            </Link>
+            <Link href="/terms" className="text-mute transition-colors hover:text-ink">
+              Terms
+            </Link>
+          </nav>
+        </div>
       </div>
     </footer>
   );
