@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { LiveClock } from "@/components/fx/LiveClock";
+import { cn } from "@/lib/cn";
 
 const rows = [
   { title: "Punch in", meta: "Today, 9:02 AM", icon: "in" as const },
@@ -39,6 +40,11 @@ const CYCLE_START = 46; // seconds
 export function CommandPalette() {
   const [remaining, setRemaining] = useState(CYCLE_START);
   const [fired, setFired] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -71,10 +77,46 @@ export function CommandPalette() {
     remaining % 60
   ).padStart(2, "0")}`;
 
+  const progress = (remaining / CYCLE_START) * 100;
+
   return (
     <div className="relative w-full">
-      <div className="palette-glow pointer-events-none absolute -inset-x-10 -top-10 bottom-0 -z-10" />
-      <div className="overflow-hidden rounded-xl border border-hairline bg-surface">
+      <div className="palette-glow pointer-events-none absolute -inset-x-20 -top-20 bottom-0 -z-10 opacity-60 mix-blend-screen blur-2xl" />
+      
+      {/* Floating badges for extra "crazy" effect */}
+      <div className="absolute -left-6 top-12 z-10 animate-float-slow sm:-left-12 sm:top-20" style={{ animationDelay: "0s" }}>
+        <div className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-surface-card/80 px-4 py-2 shadow-2xl backdrop-blur-md">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-green opacity-75"></span>
+            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-accent-green"></span>
+          </span>
+          <span className="text-[13px] font-medium text-ink">Push delivered</span>
+        </div>
+      </div>
+      
+      <div className="absolute -right-8 bottom-24 z-10 animate-float-slow sm:-right-16 sm:bottom-32" style={{ animationDelay: "1s" }}>
+        <div className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-surface-card/80 px-4 py-2 shadow-2xl backdrop-blur-md">
+          <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 text-accent-blue">
+            <path d="M4 7.00005L10.2 11.65C11.2667 12.45 12.7333 12.45 13.8 11.65L20 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
+          <span className="text-[13px] font-medium text-ink">Email sent</span>
+        </div>
+      </div>
+
+      <div className="relative overflow-hidden rounded-2xl border border-white/[0.12] bg-surface/80 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.15)] backdrop-blur-2xl transition-all duration-500 group-hover:border-white/[0.2]">
+        
+        {/* Flash effect when fired */}
+        <div 
+          className={cn(
+            "pointer-events-none absolute inset-0 z-50 transition-opacity duration-500",
+            fired ? "opacity-100" : "opacity-0"
+          )}
+        >
+          <div className="absolute inset-0 bg-accent-red/5 mix-blend-screen" />
+          <div className="absolute inset-0 shadow-[inset_0_0_80px_rgba(255,97,97,0.15)]" />
+        </div>
+
         {/* window chrome */}
         <div className="flex items-center gap-3 border-b border-hairline px-4 py-3">
           <div className="flex items-center gap-1.5">
@@ -98,25 +140,41 @@ export function CommandPalette() {
         {/* active reminder row */}
         <div className="px-2.5 pt-2.5">
           <div
-            className={`flex items-center gap-3 rounded-md px-3 py-3 ring-1 transition-colors duration-500 ${
+            className={cn(
+              "relative flex items-center gap-3 overflow-hidden rounded-md px-3 py-3 ring-1 transition-all duration-500",
               fired ? "bg-accent-red/10 ring-accent-red/30" : "bg-surface-card ring-hairline"
-            }`}
+            )}
           >
-            <span className="flex h-9 w-9 items-center justify-center rounded-md border border-hairline bg-gradient-to-b from-surface-card to-surface">
+            {/* Progress bar */}
+            {!fired && (
+              <div 
+                className="absolute bottom-0 left-0 h-[2px] bg-accent-green/40 transition-all duration-1000 ease-linear"
+                style={{ width: `${progress}%` }}
+              />
+            )}
+
+            {/* Shimmer sweep */}
+            {!fired && (
+              <div className="absolute inset-0 -translate-x-[150%] skew-x-[-20deg] animate-[shimmer_3s_infinite] bg-gradient-to-r from-transparent via-white/[0.05] to-transparent" />
+            )}
+
+            <span className="relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-hairline bg-gradient-to-b from-surface-card to-surface">
               <span className="relative flex h-2.5 w-2.5">
                 <span
-                  className={`absolute inline-flex h-full w-full animate-pulse-dot rounded-full opacity-70 ${
+                  className={cn(
+                    "absolute inline-flex h-full w-full animate-pulse-dot rounded-full opacity-70",
                     fired ? "bg-accent-red" : "bg-accent-green"
-                  }`}
+                  )}
                 />
                 <span
-                  className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
+                  className={cn(
+                    "relative inline-flex h-2.5 w-2.5 rounded-full transition-colors duration-500",
                     fired ? "bg-accent-red" : "bg-accent-green"
-                  }`}
+                  )}
                 />
               </span>
             </span>
-            <div className="min-w-0 flex-1">
+            <div className="relative z-10 min-w-0 flex-1">
               <p className="truncate text-[14px] font-medium text-ink">
                 {fired ? "Punch out now" : "Time to punch out"}
               </p>
@@ -125,13 +183,20 @@ export function CommandPalette() {
                   <span className="text-accent-green">
                     Reminder sent · Email + Push ✓
                   </span>
-                ) : (
+                ) : mounted ? (
                   `Scheduled for ${targetStr}`
+                ) : (
+                  "Scheduling…"
                 )}
               </p>
             </div>
-            <div className="text-right">
-              <p className="tabular text-[15px] font-medium tracking-tight text-ink">
+            <div className="relative z-10 text-right">
+              <p 
+                className={cn(
+                  "tabular text-[15px] font-medium tracking-tight transition-colors duration-300",
+                  fired ? "text-ink" : remaining <= 10 ? "text-accent-red animate-pulse" : "text-ink"
+                )}
+              >
                 {fired ? "00:00" : mmss}
               </p>
               <p className="text-[11px] text-ash">{fired ? "done" : "remaining"}</p>
@@ -144,9 +209,9 @@ export function CommandPalette() {
           {rows.map((row) => (
             <div
               key={row.title}
-              className="flex items-center gap-3 rounded-sm px-3 py-2.5 transition-colors hover:bg-surface-elevated"
+              className="group/row flex items-center gap-3 rounded-sm px-3 py-2.5 transition-colors hover:bg-surface-elevated"
             >
-              <span className="flex h-8 w-8 items-center justify-center rounded-md border border-hairline bg-surface-elevated">
+              <span className="flex h-8 w-8 items-center justify-center rounded-md border border-hairline bg-surface-elevated transition-colors group-hover/row:border-white/[0.12] group-hover/row:text-ink">
                 <RowIcon kind={row.icon} />
               </span>
               <span className="flex-1 text-[13px] text-body">{row.title}</span>
@@ -156,7 +221,7 @@ export function CommandPalette() {
         </div>
 
         {/* footer bar */}
-        <div className="flex items-center justify-between border-t border-hairline px-4 py-2.5">
+        <div className="flex items-center justify-between border-t border-hairline px-4 py-2.5 bg-surface/50">
           <div className="flex items-center gap-2 text-[12px] text-ash">
             <span className="keycap">↵</span>
             <span>Punch out</span>
