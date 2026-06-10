@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 
 type Status = "idle" | "unsupported" | "enabling" | "enabled" | "denied" | "error";
 
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
+function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
   const raw = atob(base64);
-  const out = new Uint8Array(raw.length);
+  const buffer = new ArrayBuffer(raw.length);
+  const out = new Uint8Array(buffer);
   for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
   return out;
 }
@@ -52,7 +53,7 @@ export function EnableReminders() {
 
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapid),
+        applicationServerKey: urlBase64ToUint8Array(vapid) as BufferSource,
       });
 
       const res = await fetch("/api/push/subscribe", {
