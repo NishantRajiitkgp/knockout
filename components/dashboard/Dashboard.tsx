@@ -142,6 +142,22 @@ function DashboardInner({ userName }: { userName: string | null }) {
     }
   }, [active, toast]);
 
+  const removeLog = useCallback(
+    async (id: string) => {
+      const prev = recent;
+      setRecent((r) => r.filter((s) => s.id !== id)); // optimistic
+      try {
+        const res = await fetch(`/api/sessions/${id}`, { method: "DELETE" });
+        if (!res.ok) throw new Error("Could not delete");
+        toast({ kind: "info", text: "Log deleted." });
+      } catch (e) {
+        setRecent(prev); // rollback
+        toast({ kind: "error", text: e instanceof Error ? e.message : "Could not delete" });
+      }
+    },
+    [recent, toast]
+  );
+
   return (
     <div className="mx-auto max-w-3xl px-5 py-10 sm:py-14">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -177,7 +193,7 @@ function DashboardInner({ userName }: { userName: string | null }) {
         )}
       </div>
 
-      <History sessions={recent} />
+      <History sessions={recent} onDelete={removeLog} />
 
       <Diagnostics />
     </div>
@@ -515,7 +531,13 @@ function ActiveSessionCard({
 }
 
 /* ── History ──────────────────────────────────────────────── */
-function History({ sessions }: { sessions: PunchSession[] }) {
+function History({
+  sessions,
+  onDelete,
+}: {
+  sessions: PunchSession[];
+  onDelete: (id: string) => Promise<void>;
+}) {
   if (sessions.length === 0) return null;
 
   return (
@@ -525,48 +547,102 @@ function History({ sessions }: { sessions: PunchSession[] }) {
         <span className="text-[12px] text-ash">{sessions.length} logged</span>
       </div>
       <ul className="mt-3 flex flex-col gap-2">
-        {sessions.map((s) => {
-          const tz = s.time_zone;
-          const worked = s.punched_out_at
-            ? Math.round(
-                (new Date(s.punched_out_at).getTime() - new Date(s.punch_in_at).getTime()) / 60_000
-              )
-            : null;
-          return (
-            <li
-              key={s.id}
-              className="flex items-center justify-between gap-4 rounded-lg border border-hairline bg-surface px-4 py-3"
-            >
-              <div>
-                <p className="text-[14px] font-semibold text-ink">{formatDay(s.punch_in_at, tz)}</p>
-                <p className="mt-1 flex items-center gap-2 text-[12.5px] text-mute">
-                  <span className="tabular">{formatClock(s.punch_in_at, tz)}</span>
-                  <span className="text-stone">→</span>
-                  <span className="tabular">
-                    {s.punched_out_at ? formatClock(s.punched_out_at, tz) : "—"}
-                  </span>
-                </p>
-              </div>
-              <div className="text-right">
-                {worked != null ? (
-                  <>
-                    <p className="tabular text-[14px] font-semibold text-ink">
-                      {formatDuration(Math.max(0, worked))}
-                    </p>
-                    <p className="text-[11.5px] text-ash">worked</p>
-                  </>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-accent-yellow/30 bg-accent-yellow/10 px-2.5 py-1 text-[11.5px] font-medium text-accent-yellow">
-                    <span className="h-1.5 w-1.5 rounded-full bg-accent-yellow" />
-                    No punch-out
-                  </span>
-                )}
-              </div>
-            </li>
-          );
-        })}
+        {sessions.map((s) => (
+          <HistoryRow key={s.id} session={s} onDelete={onDelete} />
+        ))}
       </ul>
     </div>
+  );
+}
+
+function HistoryRow({
+  session: s,
+  onDelete,
+}: {
+  session: PunchSession;
+  onDelete: (id: string) => Promise<void>;
+}) {
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const tz = s.time_zone;
+  const worked = s.punched_out_at
+    ? Math.round((new Date(s.punched_out_at).getTime() - new Date(s.punch_in_at).getTime()) / 60_000)
+    : null;
+
+  return (
+    <li className="flex items-center justify-between gap-3 rounded-lg border border-hairline bg-surface px-4 py-3">
+      <div className="min-w-0">
+        <p className="text-[14px] font-semibold text-ink">{formatDay(s.punch_in_at, tz)}</p>
+        <p className="mt-1 flex items-center gap-2 text-[12.5px] text-mute">
+          <span className="tabular">{formatClock(s.punch_in_at, tz)}</span>
+          <span className="text-stone">→</span>
+          <span className="tabular">
+            {s.punched_out_at ? formatClock(s.punched_out_at, tz) : "—"}
+          </span>
+        </p>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-3">
+        {worked != null ? (
+          <div className="text-right">
+            <p className="tabular text-[14px] font-semibold text-ink">
+              {formatDuration(Math.max(0, worked))}
+            </p>
+            <p className="text-[11.5px] text-ash">worked</p>
+          </div>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-accent-yellow/30 bg-accent-yellow/10 px-2.5 py-1 text-[11.5px] font-medium text-accent-yellow">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent-yellow" />
+            No punch-out
+          </span>
+        )}
+
+        {confirm ? (
+          <span className="inline-flex items-center gap-2 text-[12px]">
+            <button
+              onClick={async () => {
+                setBusy(true);
+                await onDelete(s.id);
+              }}
+              disabled={busy}
+              className="font-medium text-accent-red transition-colors hover:text-accent-red/80 disabled:opacity-60"
+            >
+              {busy ? "Deleting…" : "Delete"}
+            </button>
+            <span className="text-stone">·</span>
+            <button
+              onClick={() => setConfirm(false)}
+              disabled={busy}
+              className="text-mute transition-colors hover:text-ink"
+            >
+              keep
+            </button>
+          </span>
+        ) : (
+          <button
+            onClick={() => setConfirm(true)}
+            aria-label="Delete this log"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-ash transition-colors hover:bg-surface-elevated hover:text-accent-red"
+          >
+            <TrashIcon />
+          </button>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
+      <path
+        d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2m2 0v12a1 1 0 01-1 1H7a1 1 0 01-1-1V7M10 11v6M14 11v6"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
