@@ -53,12 +53,19 @@ export function Features() {
 
           <Reveal delay={80}>
             <FeatureCard
+              title="A nudge to clock in, too"
+              body="Switch on an optional daily reminder and we'll ping you to punch in at your start time — email + push. Off by default, yours to toggle."
+            />
+          </Reveal>
+
+          <Reveal delay={160}>
+            <FeatureCard
               title="Sign in with Google"
               body="No new password to forget. Your work email is where the reminder lands."
             />
           </Reveal>
 
-          <Reveal delay={160}>
+          <Reveal delay={80}>
             <FeatureCard
               title="We never watch you work"
               body="No activity tracking, no screenshots, no surveillance. We know when you started — nothing more — and when to stop you."
