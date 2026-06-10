@@ -27,6 +27,38 @@ export function formatClock(iso: string, timeZone?: string | null): string {
   });
 }
 
+function calendarDay(iso: string | number | Date, timeZone?: string | null): string {
+  return new Date(iso).toLocaleDateString("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    ...(timeZone ? { timeZone } : {}),
+  });
+}
+
+/** Friendly day label: "Today", "Yesterday", or "Wed, Jun 10". */
+export function formatDay(iso: string, timeZone?: string | null): string {
+  const target = calendarDay(iso, timeZone);
+  const now = Date.now();
+  if (target === calendarDay(now, timeZone)) return "Today";
+  if (target === calendarDay(now - 86_400_000, timeZone)) return "Yesterday";
+  return new Date(iso).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    ...(timeZone ? { timeZone } : {}),
+  });
+}
+
+/** Long date for headers: "Wednesday, Jun 10". */
+export function formatLongDate(date: Date = new Date()): string {
+  return date.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 /** True when remind_at lands on a different calendar day than punch_in. */
 export function isNextDay(
   punchInIso: string,

@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PunchSession } from "@/lib/supabase";
-import { formatClock, formatDuration, isNextDay } from "@/lib/time";
+import { formatClock, formatDay, formatDuration, formatLongDate, isNextDay } from "@/lib/time";
+import { fireConfetti } from "@/lib/confetti";
 import { EnableReminders } from "./EnableReminders";
 import { Diagnostics } from "./Diagnostics";
 import { ToastProvider, useToast } from "./Toast";
+import { TimeWheel } from "./TimeWheel";
 
 function nowTimeStr(): string {
   const d = new Date();
@@ -144,7 +146,10 @@ function DashboardInner({ userName }: { userName: string | null }) {
     <div className="mx-auto max-w-3xl px-5 py-10 sm:py-14">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-[26px] font-semibold tracking-tightish text-ink">
+          <p className="text-[12.5px] font-medium uppercase tracking-wide text-ash">
+            {formatLongDate()}
+          </p>
+          <h1 className="mt-1 text-[26px] font-semibold tracking-tightish text-ink">
             {greeting()}
             {userName ? `, ${userName.split(" ")[0]}` : ""}.
           </h1>
@@ -216,20 +221,17 @@ function PunchInCard({
   return (
     <div className="rounded-xl border border-hairline bg-surface p-6 sm:p-8">
       <div className="grid gap-6 sm:grid-cols-2">
-        <label className="block">
-          <span className="text-[13px] text-mute">I punched in at</span>
-          <input
-            type="time"
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
-            className="mt-2 w-full rounded-md border border-hairline bg-surface-elevated px-3 py-2.5 text-[18px] text-ink outline-none transition-colors focus:border-hairline-strong [color-scheme:dark]"
-          />
-        </label>
+        <div>
+          <span className="text-[13px] font-medium text-body">I punched in at</span>
+          <div className="mt-2 rounded-lg border border-hairline bg-surface-elevated px-2 py-1.5">
+            <TimeWheel value={time} onChange={setTime} />
+          </div>
+        </div>
 
         <div>
           <div className="flex items-baseline justify-between">
-            <span className="text-[13px] text-mute">Working hours</span>
-            <span className="tabular text-[15px] font-medium text-ink">
+            <span className="text-[13px] font-medium text-body">Working hours</span>
+            <span className="tabular text-[15px] font-semibold text-ink">
               {formatDuration(Math.round(hours * 60))}
             </span>
           </div>
@@ -258,6 +260,15 @@ function PunchInCard({
   );
 }
 
+function fmtHours(h: number): string {
+  return h.toFixed(2).replace(/\.?0+$/, "");
+}
+
+function clampHours(n: number): number {
+  if (Number.isNaN(n)) return 1;
+  return Math.min(24, Math.max(1, +n.toFixed(2)));
+}
+
 function HoursStepper({
   hours,
   setHours,
@@ -265,13 +276,41 @@ function HoursStepper({
   hours: number;
   setHours: React.Dispatch<React.SetStateAction<number>>;
 }) {
+  // Local text state so the user can freely type (e.g. "8.", "8.5") before commit.
+  const [text, setText] = useState(() => fmtHours(hours));
+
+  useEffect(() => {
+    setText(fmtHours(hours));
+  }, [hours]);
+
+  function commit() {
+    const n = parseFloat(text);
+    if (Number.isNaN(n)) {
+      setText(fmtHours(hours));
+      return;
+    }
+    setHours(clampHours(n));
+  }
+
   return (
     <div className="mt-2 flex items-center gap-2">
       <Stepper label="Decrease hours" onClick={() => setHours((h) => Math.max(1, +(h - 0.5).toFixed(2)))}>
         &minus;
       </Stepper>
-      <div className="flex-1 rounded-md border border-hairline bg-surface-elevated py-2.5 text-center tabular text-[16px] text-ink">
-        {hours.toFixed(2).replace(/\.00$/, "")} h
+      <div className="flex flex-1 items-center justify-center gap-1 rounded-md border border-hairline bg-surface-elevated py-2.5 transition-colors focus-within:border-hairline-strong">
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value.replace(/[^\d.]/g, ""))}
+          onBlur={commit}
+          onFocus={(e) => e.currentTarget.select()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
+          inputMode="decimal"
+          aria-label="Working hours, edit by typing"
+          className="w-14 bg-transparent text-right tabular text-[16px] font-semibold text-ink outline-none"
+        />
+        <span className="text-[14px] text-mute">h</span>
       </div>
       <Stepper label="Increase hours" onClick={() => setHours((h) => Math.min(24, +(h + 0.5).toFixed(2)))}>
         +
@@ -318,17 +357,45 @@ function ActiveSessionCard({
   const [adjusting, setAdjusting] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [hours, setHours] = useState(session.working_minutes / 60);
-
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
+  const celebrated = useRef(false);
 
   const remindMs = new Date(session.remind_at).getTime();
+  const OVERDUE_CAP_S = 15 * 60; // stop counting after 15 min — task's done, no need to burn cycles
+
+  // Tick every second, but stop the timer once we're 15 min overdue.
+  useEffect(() => {
+    const id = setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      if (t - remindMs >= OVERDUE_CAP_S * 1000) clearInterval(id);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [remindMs, OVERDUE_CAP_S]);
+
   const diff = Math.round((remindMs - now) / 1000);
   const fired = diff <= 0;
-  const abs = Math.abs(diff);
-  const countdown = `${Math.floor(abs / 3600)}h ${String(Math.floor((abs % 3600) / 60)).padStart(2, "0")}m ${String(abs % 60).padStart(2, "0")}s`;
+  const overdueS = fired ? Math.abs(diff) : 0;
+  const capped = overdueS >= OVERDUE_CAP_S;
+  const shownS = fired ? Math.min(overdueS, OVERDUE_CAP_S) : Math.abs(diff);
+  const countdown = `${Math.floor(shownS / 3600)}h ${String(Math.floor((shownS % 3600) / 60)).padStart(2, "0")}m ${String(shownS % 60).padStart(2, "0")}s`;
+
+  // Celebrate the moment the day is done — live if on screen, or on next open
+  // if it already passed. Once per session (persisted), so reopening is calm.
+  useEffect(() => {
+    if (!fired || celebrated.current) return;
+    const key = `knockout_celebrated_${session.id}`;
+    try {
+      if (localStorage.getItem(key)) {
+        celebrated.current = true;
+        return;
+      }
+      localStorage.setItem(key, "1");
+    } catch {
+      /* private mode / storage disabled — still celebrate this once */
+    }
+    celebrated.current = true;
+    fireConfetti();
+  }, [fired, session.id]);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -362,7 +429,15 @@ function ActiveSessionCard({
 
         <div className="mt-5 rounded-lg border border-hairline bg-surface-elevated px-5 py-4">
           <p className="text-[12px] text-ash">{fired ? "Overdue by" : "Counting down"}</p>
-          <p className="tabular mt-0.5 text-[22px] font-medium text-ink">{countdown}</p>
+          <p className="tabular mt-0.5 text-[22px] font-medium text-ink">
+            {countdown}
+            {capped && <span className="text-ash">+</span>}
+          </p>
+          {capped && (
+            <p className="mt-1 text-[11.5px] text-ash">
+              Counter paused — just punch out whenever you get to it.
+            </p>
+          )}
         </div>
 
         {adjusting ? (
@@ -445,23 +520,51 @@ function History({ sessions }: { sessions: PunchSession[] }) {
 
   return (
     <div className="mt-12">
-      <h2 className="text-[13px] font-medium text-mute">Recent days</h2>
-      <ul className="mt-3 overflow-hidden rounded-lg border border-hairline">
-        {sessions.map((s, i) => (
-          <li
-            key={s.id}
-            className={`flex items-center justify-between gap-4 bg-surface px-4 py-3 ${i > 0 ? "border-t border-hairline" : ""}`}
-          >
-            <div className="flex items-center gap-3">
-              <span className="keycap tabular">{formatClock(s.punch_in_at)}</span>
-              <span className="text-ash">→</span>
-              <span className="keycap tabular">
-                {s.punched_out_at ? formatClock(s.punched_out_at) : "—"}
-              </span>
-            </div>
-            <span className="text-[12.5px] text-ash">{formatDuration(s.working_minutes)} planned</span>
-          </li>
-        ))}
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-[14px] font-semibold text-ink">Recent days</h2>
+        <span className="text-[12px] text-ash">{sessions.length} logged</span>
+      </div>
+      <ul className="mt-3 flex flex-col gap-2">
+        {sessions.map((s) => {
+          const tz = s.time_zone;
+          const worked = s.punched_out_at
+            ? Math.round(
+                (new Date(s.punched_out_at).getTime() - new Date(s.punch_in_at).getTime()) / 60_000
+              )
+            : null;
+          return (
+            <li
+              key={s.id}
+              className="flex items-center justify-between gap-4 rounded-lg border border-hairline bg-surface px-4 py-3"
+            >
+              <div>
+                <p className="text-[14px] font-semibold text-ink">{formatDay(s.punch_in_at, tz)}</p>
+                <p className="mt-1 flex items-center gap-2 text-[12.5px] text-mute">
+                  <span className="tabular">{formatClock(s.punch_in_at, tz)}</span>
+                  <span className="text-stone">→</span>
+                  <span className="tabular">
+                    {s.punched_out_at ? formatClock(s.punched_out_at, tz) : "—"}
+                  </span>
+                </p>
+              </div>
+              <div className="text-right">
+                {worked != null ? (
+                  <>
+                    <p className="tabular text-[14px] font-semibold text-ink">
+                      {formatDuration(Math.max(0, worked))}
+                    </p>
+                    <p className="text-[11.5px] text-ash">worked</p>
+                  </>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-accent-yellow/30 bg-accent-yellow/10 px-2.5 py-1 text-[11.5px] font-medium text-accent-yellow">
+                    <span className="h-1.5 w-1.5 rounded-full bg-accent-yellow" />
+                    No punch-out
+                  </span>
+                )}
+              </div>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
