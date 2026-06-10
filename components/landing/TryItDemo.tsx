@@ -15,9 +15,11 @@ function fmtTime(totalMin: number) {
 export function TryItDemo() {
   const [punchIn, setPunchIn] = useState("09:00");
   const [hours, setHours] = useState(8.5);
-  const [now, setNow] = useState<number>(() => Date.now());
+  // null until mounted so SSR and first client render match (no Date.now drift).
+  const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
+    setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
@@ -27,6 +29,10 @@ export function TryItDemo() {
     const inMin = (h || 0) * 60 + (m || 0);
     const outMinRaw = inMin + Math.round(hours * 60);
     const nextDay = outMinRaw >= 1440;
+
+    if (now === null) {
+      return { outLabel: fmtTime(outMinRaw), countdownLabel: "—", past: false, nextDay };
+    }
 
     const target = new Date(now);
     target.setHours(0, 0, 0, 0);
