@@ -18,7 +18,7 @@ html {
 
 body {
   background-color: var(--canvas);
-  color: #cdcdcd;
+  color: #d6d6d8;
   /* The signature Raycast typographic detail: ss03 (single-story g) site-wide. */
   font-feature-settings: "calt", "kern", "liga", "ss03";
   -webkit-font-smoothing: antialiased;
@@ -382,6 +382,33 @@ p {
   transform-style: preserve-3d;
   transition: transform 0.2s ease;
   will-change: transform;
+}
+
+/* ============================================================= */
+/*  Time wheel (iOS-style picker)                                */
+/* ============================================================= */
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.wheel-mask {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #000 30%,
+    #000 70%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    #000 30%,
+    #000 70%,
+    transparent 100%
+  );
 }
 
 /* ============================================================= */

@@ -29,35 +29,72 @@ export async function sendPunchOutEmail(
 
   const time = formatClock(remindAtIso, timeZone);
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const v = pickVibe();
 
   await tx.sendMail({
     from: `"Knockout" <${process.env.GMAIL_USER}>`,
     to,
-    subject: `Time to punch out — it's ${time}`,
-    text: `Your working hours are up (${time}). Don't forget to punch out. — Knockout\n${appUrl}/dashboard`,
-    html: punchOutHtml(time, appUrl),
+    subject: v.subject,
+    text: `${v.headline}\n\nIt's ${time} — your hours are done. Clock out before midnight-you remembers and spirals. 💀\n\nPunch out: ${appUrl}/dashboard\n\n— Knockout. we don't watch you work, we just make sure you log off. no cap.`,
+    html: punchOutHtml(time, appUrl, v),
   });
   return true;
 }
 
-function punchOutHtml(time: string, appUrl: string): string {
+type Vibe = { subject: string; headline: string; body: string; cta: string };
+
+/** A little randomized Gen-Z energy so the nudge never feels like the same robot. */
+function pickVibe(): Vibe {
+  const vibes: Vibe[] = [
+    {
+      subject: "bestie. clock out. now. 🥊",
+      headline: "that's a wrap 🎬",
+      body: "Your shift literally said <em>bye</em>. It's <strong style=\"color:#f4f4f6;\">{time}</strong> — punch out before future-you is filing an HR correction form at midnight. 💀",
+      cta: "Punch out now 🥊",
+    },
+    {
+      subject: "it's giving overtime — don't 🫠",
+      headline: "log off, icon 💅",
+      body: "The clock hit <strong style=\"color:#f4f4f6;\">{time}</strong> and your hours are <em>so</em> over. Close the laptop, log off, go be a person. ✨",
+      cta: "Clock me out",
+    },
+    {
+      subject: "touch grass o'clock 🌱",
+      headline: "go home, you ate today 🔥",
+      body: "It's <strong style=\"color:#f4f4f6;\">{time}</strong>. You showed up, you did the thing. Now punch out before the timesheet catches you slippin'. 🫶",
+      cta: "Punch out 🌱",
+    },
+    {
+      subject: "9-to-5 has left the chat 🫡",
+      headline: "shift = knocked out 🥊",
+      body: "Hours done as of <strong style=\"color:#f4f4f6;\">{time}</strong>. Don't be the legend logging 14 hours by accident again. Clock out, bestie. 🫡",
+      cta: "Log off",
+    },
+  ];
+  return vibes[(Math.random() * vibes.length) | 0];
+}
+
+function punchOutHtml(time: string, appUrl: string, v: Vibe): string {
+  const body = v.body.replace("{time}", time);
   return `<!doctype html><html><body style="margin:0;background:#07080a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Helvetica,Arial,sans-serif;color:#cdcdcd;padding:32px 16px;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
     <table role="presentation" width="100%" style="max-width:480px;background:#0d0d0d;border:1px solid #242728;border-radius:16px;overflow:hidden;">
       <tr><td style="height:4px;background:linear-gradient(90deg,#ff5757,#a1131a);"></td></tr>
-      <tr><td style="padding:32px 28px;">
-        <p style="margin:0;color:#6a6b6c;font-size:13px;letter-spacing:.04em;">KNOCKOUT</p>
-        <h1 style="margin:14px 0 0;color:#f4f4f6;font-size:24px;line-height:1.25;font-weight:600;">Time to punch out.</h1>
-        <p style="margin:14px 0 0;color:#cdcdcd;font-size:15px;line-height:1.6;">
-          It's <strong style="color:#f4f4f6;">${time}</strong> — your working hours are done.
-          Clock out now so it doesn't cost you tomorrow morning.
-        </p>
-        <a href="${appUrl}/dashboard" style="display:inline-block;margin-top:24px;background:#ffffff;color:#000000;text-decoration:none;font-weight:600;font-size:14px;padding:12px 22px;border-radius:8px;">Open Knockout</a>
-        <p style="margin:28px 0 0;color:#6a6b6c;font-size:12px;line-height:1.6;">
-          You're getting this because you punched in on Knockout today. We don't track your work — we just walk you out.
+      <tr><td style="padding:30px 28px 32px;">
+        <p style="margin:0;color:#6a6b6c;font-size:12px;letter-spacing:.18em;font-weight:600;">KNOCKOUT</p>
+        <div style="margin:18px 0 4px;font-size:44px;line-height:1;">🥊</div>
+        <h1 style="margin:10px 0 0;color:#f4f4f6;font-size:28px;line-height:1.18;font-weight:700;letter-spacing:-0.01em;">${v.headline}</h1>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:18px 0 0;">
+          <tr><td style="background:#141414;border:1px solid #242728;border-radius:999px;padding:7px 14px;color:#7CF0BD;font-size:13px;font-weight:600;letter-spacing:.02em;">⏰ punch-out time · ${time}</td></tr>
+        </table>
+        <p style="margin:18px 0 0;color:#cdcdcd;font-size:15px;line-height:1.65;">${body}</p>
+        <a href="${appUrl}/dashboard" style="display:inline-block;margin-top:24px;background:#ffffff;color:#000000;text-decoration:none;font-weight:700;font-size:14px;padding:13px 24px;border-radius:10px;">${v.cta}</a>
+        <p style="margin:30px 0 0;color:#5f6061;font-size:12px;line-height:1.7;border-top:1px solid #1c1f20;padding-top:18px;">
+          you got this bc you clocked in today 🫶 we don't watch you work — we just make sure you log tf off. no cap.
         </p>
       </td></tr>
     </table>
+    <p style="margin:16px 0 0;color:#3f4041;font-size:11px;">go home. the clock already did. 🌙</p>
   </td></tr></table>
 </body></html>`;
 }
